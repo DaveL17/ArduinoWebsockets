@@ -1,42 +1,42 @@
 #include <tiny_websockets/internals/websockets_endpoint.hpp>
 
-namespace websockets { 
+namespace websockets {
 
     CloseReason GetCloseReason(uint16_t reasonCode) {
         switch(reasonCode) {
-            case CloseReason_NormalClosure: 
+            case CloseReason_NormalClosure:
                 return CloseReason_NormalClosure;
-            
-            case CloseReason_GoingAway: 
+
+            case CloseReason_GoingAway:
                 return CloseReason_GoingAway;
-            
-            case CloseReason_ProtocolError: 
+
+            case CloseReason_ProtocolError:
                 return CloseReason_ProtocolError;
-            
-            case CloseReason_UnsupportedData: 
+
+            case CloseReason_UnsupportedData:
                 return CloseReason_UnsupportedData;
-            
-            case CloseReason_AbnormalClosure: 
+
+            case CloseReason_AbnormalClosure:
                 return CloseReason_AbnormalClosure;
-            
-            case CloseReason_InvalidPayloadData: 
+
+            case CloseReason_InvalidPayloadData:
                 return CloseReason_InvalidPayloadData;
-            
-            case CloseReason_PolicyViolation: 
+
+            case CloseReason_PolicyViolation:
                 return CloseReason_PolicyViolation;
-            
-            case CloseReason_MessageTooBig: 
+
+            case CloseReason_MessageTooBig:
                 return CloseReason_MessageTooBig;
-            
-            case CloseReason_NoStatusRcvd: 
+
+            case CloseReason_NoStatusRcvd:
                 return CloseReason_NoStatusRcvd;
-            
-            case CloseReason_InternalServerError: 
+
+            case CloseReason_InternalServerError:
                 return CloseReason_InternalServerError;
 
             default: return CloseReason_None;
         }
-    }    
+    }
 
 namespace internals {
 
@@ -52,17 +52,17 @@ namespace internals {
     uint64_t swapEndianess(uint64_t num) {
         uint32_t upper = (num >> 32);
         uint32_t lower = (num << 32) >> 32;
-    
+
         upper = swapEndianess(upper);
         lower = swapEndianess(lower);
-    
+
         uint64_t upperLong = upper;
         uint64_t lowerLong = lower;
-        
+
         return upperLong | (lowerLong << 32);
     }
 
-    WebsocketsEndpoint::WebsocketsEndpoint(std::shared_ptr<network::TcpClient> client, FragmentsPolicy fragmentsPolicy) : 
+    WebsocketsEndpoint::WebsocketsEndpoint(std::shared_ptr<network::TcpClient> client, FragmentsPolicy fragmentsPolicy) :
         _client(client),
         _fragmentsPolicy(fragmentsPolicy),
         _recvMode(RecvMode_Normal),
@@ -71,21 +71,21 @@ namespace internals {
         // Empty
     }
 
-    WebsocketsEndpoint::WebsocketsEndpoint(const WebsocketsEndpoint& other) : 
-        _client(other._client), 
-        _fragmentsPolicy(other._fragmentsPolicy), 
-        _recvMode(other._recvMode), 
-        _streamBuilder(other._streamBuilder), 
+    WebsocketsEndpoint::WebsocketsEndpoint(const WebsocketsEndpoint& other) :
+        _client(other._client),
+        _fragmentsPolicy(other._fragmentsPolicy),
+        _recvMode(other._recvMode),
+        _streamBuilder(other._streamBuilder),
         _closeReason(other._closeReason),
         _useMasking(other._useMasking) {
 
         const_cast<WebsocketsEndpoint&>(other)._client = nullptr;
     }
-    WebsocketsEndpoint::WebsocketsEndpoint(const WebsocketsEndpoint&& other) : 
-        _client(other._client), 
-        _fragmentsPolicy(other._fragmentsPolicy), 
-        _recvMode(other._recvMode), 
-        _streamBuilder(other._streamBuilder), 
+    WebsocketsEndpoint::WebsocketsEndpoint(const WebsocketsEndpoint&& other) :
+        _client(other._client),
+        _fragmentsPolicy(other._fragmentsPolicy),
+        _recvMode(other._recvMode),
+        _streamBuilder(other._streamBuilder),
         _closeReason(other._closeReason),
         _useMasking(other._useMasking) {
 
@@ -279,22 +279,22 @@ namespace internals {
                     auto messageType = this->_streamBuilder.type();
                     this->_streamBuilder = WebsocketsMessage::StreamBuilder(true);
                     return WebsocketsMessage(messageType, std::move(frame.payload), MessageRole::Last);
-                }                
+                }
             }
-        } 
-        
+        }
+
         // Error
         close(CloseReason_ProtocolError);
         return {};
     }
 
     WebsocketsMessage WebsocketsEndpoint::handleFrameInStandardMode(WebsocketsFrame& frame) {
-        // Normal (unfragmented) frames are handled as a complete message 
+        // Normal (unfragmented) frames are handled as a complete message
         if(frame.isNormalUnfragmentedMessage() || frame.isControlFrame()) {
             auto msg = WebsocketsMessage::CreateFromFrame(std::move(frame));
             this->handleMessageInternally(msg);
             return msg;
-        } 
+        }
         else if(frame.isBeginningOfFragmentsStream()) {
             return handleFrameInStreamingMode(frame);
         }
@@ -304,7 +304,7 @@ namespace internals {
         return {};
     }
 
-    WebsocketsMessage WebsocketsEndpoint::recv() {        
+    WebsocketsMessage WebsocketsEndpoint::recv() {
         auto frame = _recv();
         if (frame.isEmpty()) {
             return {};
@@ -312,7 +312,7 @@ namespace internals {
 
         if(this->_recvMode == RecvMode_Normal) {
             return handleFrameInStandardMode(frame);
-        } 
+        }
         else /* this->_recvMode == RecvMode_Streaming */ {
             return handleFrameInStreamingMode(frame);
         }
@@ -320,7 +320,8 @@ namespace internals {
 
     void WebsocketsEndpoint::handleMessageInternally(WebsocketsMessage& msg) {
         if(msg.isPing()) {
-            pong(internals::fromInterfaceString(msg.data()));
+            // pong(internals::fromInterfaceString(msg.data()));  // DaveL17 2024/12/27 changed to following line based on https://github.com/gilmaimon/ArduinoWebsockets/issues/151#issuecomment-1999688565
+            pong(std::move(msg.rawData()));
         } else if(msg.isClose()) {
             // is there a reason field
             if(internals::fromInterfaceString(msg.data()).size() >= 2) {
@@ -342,13 +343,13 @@ namespace internals {
         return this->send(data, opcode, fin, this->_useMasking);
     }
 
-    bool WebsocketsEndpoint::send(const WSString& data, const uint8_t opcode, const bool fin, const bool mask, const char* maskingKey) { 
+    bool WebsocketsEndpoint::send(const WSString& data, const uint8_t opcode, const bool fin, const bool mask, const char* maskingKey) {
         return send(data.c_str(), data.size(), opcode, fin, mask, maskingKey);
     }
 
     std::string WebsocketsEndpoint::getHeader(uint64_t len, uint8_t opcode, bool fin, bool mask) {
       std::string header_data;
-      
+
         if(len < 126) {
             auto header = MakeHeader<Header>(len, opcode, fin, mask);
             header_data = std::string(reinterpret_cast<char*>(&header), 2 + 0);
@@ -401,7 +402,7 @@ namespace internals {
 
     void WebsocketsEndpoint::close(CloseReason reason) {
         this->_closeReason = reason;
-        
+
         if(!this->_client->available()) return;
 
         if(reason == CloseReason_None) {
