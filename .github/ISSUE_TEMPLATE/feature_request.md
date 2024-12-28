@@ -3,7 +3,7 @@ name: Feature request
 about: Suggest an idea for the library
 title: ''
 labels: ''
-assignees: gilmaimon
+assignees: ''
 
 ---
 

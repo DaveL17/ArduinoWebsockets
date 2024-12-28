@@ -3,7 +3,7 @@ name: Bug report
 about: Create a bug report to help the library improve
 title: ''
 labels: ''
-assignees: gilmaimon
+assignees: ''
 
 ---
 
